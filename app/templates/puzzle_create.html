@@ -26,13 +26,14 @@
 </div>
 {% endblock %}
 {% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.12.1/chess.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
 <script>
 let board;
 function updateBoard() {
   const fen = document.getElementById('fen-input').value;
-  const cfg = { position: fen, pieceTheme: 'https://unpkg.com/chessboardjs@1.0.0/img/chesspieces/wikipedia/{piece}.png', draggable: false };
+  const cfg = { position: fen, pieceTheme: '/static/pieces/{piece}.svg', draggable: false };
   if (board) board.position(fen, false);
   else board = Chessboard('board', cfg);
 }

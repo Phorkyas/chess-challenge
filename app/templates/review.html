@@ -16,20 +16,21 @@
 </div>
 {% endblock %}
 {% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.12.1/chess.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
 <script>
 const solution = {{ solution_moves | tojson }};
 const puzzleId = {{ puzzle.id }};
 let game = new Chess();
-game.load('{{ fen }}');
+game.load({{ fen | tojson }});
 let userMoves = [];
 let stepIndex = 0;
 let startTime = Date.now();
 
 const board = Chessboard('board', {
-  position: '{{ fen }}',
-  pieceTheme: 'https://unpkg.com/chessboardjs@1.0.0/img/chesspieces/wikipedia/{piece}.png',
+  position: {{ fen | tojson }},
+  pieceTheme: '/static/pieces/{piece}.svg',
   draggable: true,
   onDrop: (source, target) => {
     const move = game.move({ from: source, to: target, promotion: 'q' });
@@ -57,7 +58,7 @@ function updateStatus() {
   if (game.isCheckmate()) statusEl.textContent = 'Checkmate!';
   else if (game.isDraw()) statusEl.textContent = 'Draw';
   else if (game.isCheck()) statusEl.textContent = 'Check';
-  else if (game.turn() === '{{ "w" if first_move_turn == "white" else "b" }}') {
+  else if (game.turn() === {{ ("w" if first_move_turn == "white" else "b") | tojson }}) {
     statusEl.textContent = 'Your move';
   } else {
     statusEl.textContent = 'Opponent thinking...';

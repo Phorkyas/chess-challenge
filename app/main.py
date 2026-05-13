@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.auth import (
     clear_session,
@@ -56,6 +57,7 @@ async def dashboard(
 
     due_q = (
         select(Review)
+        .options(selectinload(Review.puzzle))
         .where(Review.user_id == user.id, Review.next_review <= now)
         .order_by(Review.next_review.asc())
     )
@@ -267,6 +269,7 @@ async def review_next(
 
     review = await db.scalar(
         select(Review)
+        .options(selectinload(Review.puzzle))
         .where(Review.user_id == user.id, Review.next_review <= now)
         .order_by(Review.next_review.asc())
         .limit(1)
@@ -285,8 +288,9 @@ async def review_next(
         review = Review(user_id=user.id, puzzle_id=new_puzzle.id)
         db.add(review)
         await db.commit()
-
-    puzzle = review.puzzle
+        puzzle = new_puzzle
+    else:
+        puzzle = review.puzzle
     board = chess.Board(puzzle.fen)
     ctx = templates_with_user(request, user)
     ctx.update(
