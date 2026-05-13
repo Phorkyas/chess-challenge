@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}My Puzzles{% endblock %}
+{% block content %}
+<h1>My Puzzles</h1>
+<a href="/puzzles/new" class="btn">+ New Puzzle</a>
+
+{% if puzzles %}
+  <table style="margin-top:1rem;">
+    <thead><tr><th>Title</th><th>Created</th><th>Interval</th><th>Ease</th><th></th></tr></thead>
+    <tbody>
+    {% for p in puzzles %}
+      <tr>
+        <td>{{ p.title }}</td>
+        <td>{{ p.created_at.strftime('%Y-%m-%d') }}</td>
+        {% set r = puzzle_reviews.get(p.id) %}
+        <td>{{ r.interval if r else 'new' }}d</td>
+        <td>{{ "%.1f"|format(r.ease_factor) if r else '—' }}</td>
+        <td>
+          <form action="/puzzles/{{ p.id }}/delete" method="post" style="display:inline;margin:0;" onsubmit="return confirm('Delete this puzzle?')">
+            <button type="submit" class="btn-danger">Delete</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <p style="margin-top:1rem;">No puzzles yet. <a href="/puzzles/new">Create your first puzzle!</a></p>
+{% endif %}
+{% endblock %}

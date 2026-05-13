@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Create Puzzle{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css">
+{% endblock %}
+{% block content %}
+<h1>Create Puzzle</h1>
+<div class="card">
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+  <form method="post">
+    <label>Title</label>
+    <input type="text" name="title" required placeholder="e.g. Mate in 2 with Queen sacrifice">
+
+    <label>FEN Position (starting position or custom)</label>
+    <input type="text" name="fen" id="fen-input"
+           value="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+           onchange="updateBoard()" style="font-family:monospace;">
+
+    <div id="board" class="board-container"></div>
+
+    <label>Solution (UCI moves, space-separated)</label>
+    <textarea name="solution" required placeholder="e.g. e2e4 e7e5 g1f3 b8c6 f1b5"></textarea>
+
+    <button type="submit">Create Puzzle</button>
+  </form>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.12.1/chess.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
+<script>
+let board;
+function updateBoard() {
+  const fen = document.getElementById('fen-input').value;
+  const cfg = { position: fen, pieceTheme: 'https://unpkg.com/chessboardjs@1.0.0/img/chesspieces/wikipedia/{piece}.png', draggable: false };
+  if (board) board.position(fen, false);
+  else board = Chessboard('board', cfg);
+}
+updateBoard();
+</script>
+{% endblock %}

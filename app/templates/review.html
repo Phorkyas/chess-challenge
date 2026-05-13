@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Review{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css">
+{% endblock %}
+{% block content %}
+<h1>Review: {{ puzzle.title }}</h1>
+
+<div class="card">
+  <p><strong>{{ first_move_turn|capitalize }} to move</strong></p>
+  <div id="board" class="board-container"></div>
+  <p id="status" style="margin-top:0.5rem;font-weight:600;"></p>
+  <p style="margin-top:0.5rem;font-size:0.85rem;color:#666;">
+    Interval: {{ interval }}d · Ease: {{ "%.1f"|format(ease_factor) }} · Reviews: {{ repetitions }}
+  </p>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.12.1/chess.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
+<script>
+const solution = {{ solution_moves | tojson }};
+const puzzleId = {{ puzzle.id }};
+let game = new Chess();
+game.load('{{ fen }}');
+let userMoves = [];
+let stepIndex = 0;
+let startTime = Date.now();
+
+const board = Chessboard('board', {
+  position: '{{ fen }}',
+  pieceTheme: 'https://unpkg.com/chessboardjs@1.0.0/img/chesspieces/wikipedia/{piece}.png',
+  draggable: true,
+  onDrop: (source, target) => {
+    const move = game.move({ from: source, to: target, promotion: 'q' });
+    if (move === null) return 'snapback';
+
+    userMoves.push(move.san);
+    stepIndex++;
+
+    if (stepIndex < solution.length) {
+      const solMove = game.move(solution[stepIndex], { sloppy: true });
+      if (solMove) board.position(game.fen());
+      stepIndex++;
+    }
+
+    if (stepIndex >= solution.length || game.isGameOver()) {
+      const gradeArea = document.getElementById('grade-area');
+      gradeArea.style.display = 'block';
+    }
+    updateStatus();
+  }
+});
+
+function updateStatus() {
+  const statusEl = document.getElementById('status');
+  if (game.isCheckmate()) statusEl.textContent = 'Checkmate!';
+  else if (game.isDraw()) statusEl.textContent = 'Draw';
+  else if (game.isCheck()) statusEl.textContent = 'Check';
+  else if (game.turn() === '{{ "w" if first_move_turn == "white" else "b" }}') {
+    statusEl.textContent = 'Your move';
+  } else {
+    statusEl.textContent = 'Opponent thinking...';
+  }
+}
+</script>
+
+<div id="grade-area" class="card" style="display:none; margin-top:1rem;">
+  <h3>How did you do?</h3>
+  <form method="post" action="/review/{{ puzzle.id }}" id="grade-form">
+    <input type="hidden" name="time_ms" id="time-ms">
+    <div class="grading">
+      <button type="submit" name="grade" value="0" class="grade-btn fail">Complete blackout</button>
+      <button type="submit" name="grade" value="1" class="grade-btn fail">Seen answer, makes sense</button>
+      <button type="submit" name="grade" value="2" class="grade-btn fail">Incorrect, easy recall</button>
+      <button type="submit" name="grade" value="3" class="grade-btn pass">Correct, hard</button>
+      <button type="submit" name="grade" value="4" class="grade-btn pass">Correct, hesitated</button>
+      <button type="submit" name="grade" value="5" class="grade-btn perfect">Perfect</button>
+    </div>
+  </form>
+</div>
+
+<script>
+document.getElementById('grade-form').addEventListener('submit', () => {
+  document.getElementById('time-ms').value = Date.now() - startTime;
+});
+</script>
+{% endblock %}

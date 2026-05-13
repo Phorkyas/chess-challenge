@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<h1>Dashboard</h1>
+
+<div class="stats">
+  <div class="stat-card">
+    <div class="value">{{ total_puzzles }}</div>
+    <div class="label">Puzzles</div>
+  </div>
+  <div class="stat-card">
+    <div class="value">{{ total_reviews }}</div>
+    <div class="label">Reviews Done</div>
+  </div>
+  <div class="stat-card">
+    <div class="value">{{ (due_reviews|length) + (new_puzzles|length) }}</div>
+    <div class="label">Due Now</div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Due for Review</h2>
+  {% if due_reviews or new_puzzles %}
+    <table>
+      <thead><tr><th>Puzzle</th><th>Status</th><th>Next Review</th><th>Ease</th></tr></thead>
+      <tbody>
+      {% for r in due_reviews %}
+        <tr>
+          <td><a href="/review">{{ r.puzzle.title }}</a></td>
+          <td><span class="due-badge">Due</span></td>
+          <td>{{ r.next_review.strftime('%Y-%m-%d %H:%M') if r.next_review else '—' }}</td>
+          <td>{{ "%.1f"|format(r.ease_factor) }}</td>
+        </tr>
+      {% endfor %}
+      {% for p in new_puzzles %}
+        <tr>
+          <td><a href="/review">{{ p.title }}</a></td>
+          <td><span class="due-badge">New</span></td>
+          <td>—</td>
+          <td>—</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <a href="/review" class="btn" style="margin-top:1rem;">Start Review</a>
+  {% else %}
+    <p>All caught up! <a href="/puzzles/new">Create a puzzle</a> to start learning.</p>
+  {% endif %}
+</div>
+
+<div style="margin-top:1rem;">
+  <a href="/puzzles" class="btn btn-secondary">Manage Puzzles</a>
+</div>
+{% endblock %}

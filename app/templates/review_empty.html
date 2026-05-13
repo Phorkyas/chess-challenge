@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}No Puzzles{% endblock %}
+{% block content %}
+<div class="hero">
+  <h1>{{ message or "Nothing to review!" }}</h1>
+  {% if user %}
+    <p>You don't have any puzzles due for review.</p>
+    <div class="actions" style="margin-top:1rem;">
+      <a href="/puzzles/new" class="btn">Create a Puzzle</a>
+      <a href="/puzzles" class="btn btn-secondary">View My Puzzles</a>
+    </div>
+  {% else %}
+    <p><a href="/login">Login</a> or <a href="/register">register</a> to get started.</p>
+  {% endif %}
+</div>
+{% endblock %}
