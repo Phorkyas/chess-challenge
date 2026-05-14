@@ -61,7 +61,7 @@ async def test_create_and_review_puzzle(client):
     assert r.status_code == 200
     assert "Scholars Mate" in r.text
 
-    r = await client.post("/review/1", data={"grade": "5", "time_ms": "3000"})
+    r = await client.post("/review/1", data={"user_moves": "e2e4 d1h5 f1c4 h5f7", "time_ms": "3000"})
     assert r.status_code == 303
 
     r = await client.get("/puzzles")

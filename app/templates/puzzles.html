@@ -17,6 +17,7 @@
         <td>{{ "%.1f"|format(r.ease_factor) if r else '—' }}</td>
         <td>
           <form action="/puzzles/{{ p.id }}/delete" method="post" style="display:inline;margin:0;" onsubmit="return confirm('Delete this puzzle?')">
+          <a href="/review?puzzle_id={{ p.id }}" class="btn" style="margin-right:0.25rem;">Practice</a>
             <button type="submit" class="btn-danger">Delete</button>
           </form>
         </td>

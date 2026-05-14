@@ -264,33 +264,48 @@ async def review_next(
     request: Request,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(current_user),
+    puzzle_id: int = None,
 ):
     now = datetime.datetime.now(datetime.UTC)
 
-    review = await db.scalar(
-        select(Review)
-        .options(selectinload(Review.puzzle))
-        .where(Review.user_id == user.id, Review.next_review <= now)
-        .order_by(Review.next_review.asc())
-        .limit(1)
-    )
-    if review is None:
-        new_puzzle = await db.scalar(
-            select(Puzzle)
-            .outerjoin(Review, (Review.puzzle_id == Puzzle.id) & (Review.user_id == user.id))
-            .where(Puzzle.creator_id == user.id, Review.id.is_(None))
+    if puzzle_id is not None:
+        puzzle = await db.scalar(
+            select(Puzzle).where(Puzzle.id == puzzle_id, Puzzle.creator_id == user.id)
+        )
+        if puzzle is None:
+            raise HTTPException(status_code=404)
+        review = await db.scalar(
+            select(Review).where(Review.user_id == user.id, Review.puzzle_id == puzzle_id)
+        )
+        if review is None:
+            review = Review(user_id=user.id, puzzle_id=puzzle.id)
+            db.add(review)
+            await db.commit()
+    else:
+        review = await db.scalar(
+            select(Review)
+            .options(selectinload(Review.puzzle))
+            .where(Review.user_id == user.id, Review.next_review <= now)
+            .order_by(Review.next_review.asc())
             .limit(1)
         )
-        if new_puzzle is None:
-            ctx = templates_with_user(request, user)
-            ctx["message"] = "No puzzles to review. Create some puzzles first!"
-            return templates.TemplateResponse(request, "review_empty.html", ctx)
-        review = Review(user_id=user.id, puzzle_id=new_puzzle.id)
-        db.add(review)
-        await db.commit()
-        puzzle = new_puzzle
-    else:
-        puzzle = review.puzzle
+        if review is None:
+            new_puzzle = await db.scalar(
+                select(Puzzle)
+                .outerjoin(Review, (Review.puzzle_id == Puzzle.id) & (Review.user_id == user.id))
+                .where(Puzzle.creator_id == user.id, Review.id.is_(None))
+                .limit(1)
+            )
+            if new_puzzle is None:
+                ctx = templates_with_user(request, user)
+                ctx["message"] = "No puzzles to review. Create some puzzles first!"
+                return templates.TemplateResponse(request, "review_empty.html", ctx)
+            review = Review(user_id=user.id, puzzle_id=new_puzzle.id)
+            db.add(review)
+            await db.commit()
+            puzzle = new_puzzle
+        else:
+            puzzle = review.puzzle
     board = chess.Board(puzzle.fen)
     ctx = templates_with_user(request, user)
     ctx.update(
@@ -310,16 +325,45 @@ async def review_next(
 async def submit_review(
     request: Request,
     puzzle_id: int,
-    grade: int = Form(...),
+    user_moves: str = Form(""),
     time_ms: int = Form(0),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(current_user),
 ):
     review = await db.scalar(
-        select(Review).where(Review.user_id == user.id, Review.puzzle_id == puzzle_id)
+        select(Review)
+        .options(selectinload(Review.puzzle))
+        .where(Review.user_id == user.id, Review.puzzle_id == puzzle_id)
     )
     if review is None:
         raise HTTPException(status_code=404)
+
+    puzzle = review.puzzle
+    solution_moves = puzzle.solution_moves.split()
+    played = user_moves.strip().split() if user_moves.strip() else []
+    expected = [solution_moves[i] for i in range(0, len(solution_moves), 2)]
+
+    correct = 0
+    for i, exp in enumerate(expected):
+        if i < len(played) and played[i] == exp:
+            correct += 1
+
+    if not expected:
+        grade = 5
+    else:
+        ratio = correct / len(expected)
+        if ratio == 1.0:
+            grade = 5
+        elif ratio >= 0.75:
+            grade = 4
+        elif ratio >= 0.5:
+            grade = 3
+        elif ratio >= 0.25:
+            grade = 2
+        elif ratio > 0:
+            grade = 1
+        else:
+            grade = 0
 
     old_state = ReviewState(review.ease_factor, review.interval, review.repetitions)
     new_state = sm2(old_state, grade)

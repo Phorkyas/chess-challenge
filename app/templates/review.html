@@ -14,6 +14,15 @@
     Interval: {{ interval }}d · Ease: {{ "%.1f"|format(ease_factor) }} · Reviews: {{ repetitions }}
   </p>
 </div>
+
+<div id="result-area" class="card" style="display:none; margin-top:1rem;">
+  <h3 id="result-heading"></h3>
+  <p id="result-detail"></p>
+  <form method="post" action="/review/{{ puzzle.id }}" id="grade-form">
+    <input type="hidden" name="user_moves" id="user-moves">
+    <input type="hidden" name="time_ms" id="time-ms">
+  </form>
+</div>
 {% endblock %}
 {% block scripts %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
@@ -27,16 +36,57 @@ game.load({{ fen | tojson }});
 let userMoves = [];
 let stepIndex = 0;
 let startTime = Date.now();
+let finished = false;
+
+function expectedUserMoves() {
+  const moves = [];
+  for (let i = 0; i < solution.length; i += 2) moves.push(solution[i]);
+  return moves;
+}
+
+function finish(grade, correct, total) {
+  if (finished) return;
+  finished = true;
+  board.draggable = false;
+
+  const heading = document.getElementById('result-heading');
+  const detail = document.getElementById('result-detail');
+  if (grade === 5) {
+    heading.textContent = 'Perfect!';
+    detail.textContent = `All ${total} move(s) correct.`;
+  } else if (grade >= 4) {
+    heading.textContent = 'Good';
+    detail.textContent = `${correct} of ${total} move(s) correct.`;
+  } else if (grade >= 3) {
+    heading.textContent = 'Okay';
+    detail.textContent = `${correct} of ${total} move(s) correct.`;
+  } else if (grade > 0) {
+    heading.textContent = 'Needs work';
+    detail.textContent = `Only ${correct} of ${total} move(s) correct.`;
+  } else {
+    heading.textContent = 'Incorrect';
+    detail.textContent = `0 of ${total} move(s) correct.`;
+  }
+
+  document.getElementById('result-area').style.display = 'block';
+  document.getElementById('user-moves').value = userMoves.join(' ');
+  document.getElementById('time-ms').value = Date.now() - startTime;
+  setTimeout(() => document.getElementById('grade-form').submit(), 1500);
+}
 
 const board = Chessboard('board', {
   position: {{ fen | tojson }},
   pieceTheme: '/static/pieces/{piece}.svg',
   draggable: true,
   onDrop: (source, target) => {
+    if (finished) return 'snapback';
+
     const move = game.move({ from: source, to: target, promotion: 'q' });
     if (move === null) return 'snapback';
 
-    userMoves.push(move.san);
+    let uci = source + target;
+    if (move.promotion) uci += move.promotion;
+    userMoves.push(uci);
     stepIndex++;
 
     if (stepIndex < solution.length) {
@@ -46,8 +96,21 @@ const board = Chessboard('board', {
     }
 
     if (stepIndex >= solution.length || game.isGameOver()) {
-      const gradeArea = document.getElementById('grade-area');
-      gradeArea.style.display = 'block';
+      const expected = expectedUserMoves();
+      let correct = 0;
+      for (let i = 0; i < expected.length; i++) {
+        if (i < userMoves.length && userMoves[i] === expected[i]) correct++;
+      }
+      const total = expected.length;
+      const ratio = total ? correct / total : 1;
+      let grade;
+      if (ratio === 1) grade = 5;
+      else if (ratio >= 0.75) grade = 4;
+      else if (ratio >= 0.5) grade = 3;
+      else if (ratio >= 0.25) grade = 2;
+      else if (ratio > 0) grade = 1;
+      else grade = 0;
+      finish(grade, correct, total);
     }
     updateStatus();
   }
@@ -64,26 +127,5 @@ function updateStatus() {
     statusEl.textContent = 'Opponent thinking...';
   }
 }
-</script>
-
-<div id="grade-area" class="card" style="display:none; margin-top:1rem;">
-  <h3>How did you do?</h3>
-  <form method="post" action="/review/{{ puzzle.id }}" id="grade-form">
-    <input type="hidden" name="time_ms" id="time-ms">
-    <div class="grading">
-      <button type="submit" name="grade" value="0" class="grade-btn fail">Complete blackout</button>
-      <button type="submit" name="grade" value="1" class="grade-btn fail">Seen answer, makes sense</button>
-      <button type="submit" name="grade" value="2" class="grade-btn fail">Incorrect, easy recall</button>
-      <button type="submit" name="grade" value="3" class="grade-btn pass">Correct, hard</button>
-      <button type="submit" name="grade" value="4" class="grade-btn pass">Correct, hesitated</button>
-      <button type="submit" name="grade" value="5" class="grade-btn perfect">Perfect</button>
-    </div>
-  </form>
-</div>
-
-<script>
-document.getElementById('grade-form').addEventListener('submit', () => {
-  document.getElementById('time-ms').value = Date.now() - startTime;
-});
 </script>
 {% endblock %}
