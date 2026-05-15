@@ -7,14 +7,38 @@
 <h1>Create Puzzle</h1>
 <div class="card">
   {% if error %}<p class="error">{{ error }}</p>{% endif %}
-  <form method="post">
+  <form method="post" class="wide">
+
     <label>Title</label>
     <input type="text" name="title" required placeholder="e.g. Mate in 2 with Queen sacrifice">
 
-    <label>FEN Position (starting position or custom)</label>
-    <input type="text" name="fen" id="fen-input"
-           value="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
-           onchange="updateBoard()" style="font-family:monospace;">
+    <div class="mode-toggle">
+      <label class="radio-label">
+        <input type="radio" name="input_mode" value="fen" checked onchange="switchMode('fen')"> FEN
+      </label>
+      <label class="radio-label">
+        <input type="radio" name="input_mode" value="editor" onchange="switchMode('editor')"> Board Editor
+      </label>
+    </div>
+
+    <div id="fen-group">
+      <label>FEN Position</label>
+      <input type="text" name="fen" id="fen-input"
+             value="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+             onchange="updateBoard()" style="font-family:monospace;">
+    </div>
+
+    <div id="editor-controls" style="display:none;">
+      <button type="button" class="btn-small" onclick="clearBoard()">Clear</button>
+      <button type="button" class="btn-small" onclick="startPosition()">Start Pos</button>
+      <button type="button" class="btn-small" onclick="flipBoard()">Flip</button>
+      <label class="turn-label">Turn:
+        <select id="turn-select" onchange="updateFenFromBoard()">
+          <option value="w">White</option>
+          <option value="b">Black</option>
+        </select>
+      </label>
+    </div>
 
     <div id="board" class="board-container"></div>
 
@@ -31,12 +55,112 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
 <script>
 let board;
+let editorMode = false;
+let pendingDrop = null;
+
+function positionToFen(pos) {
+  let fen = '';
+  for (let rank = 8; rank >= 1; rank--) {
+    let empty = 0;
+    for (let file = 0; file < 8; file++) {
+      const square = 'abcdefgh'[file] + rank;
+      const piece = pos[square];
+      if (piece) {
+        if (empty > 0) { fen += empty; empty = 0; }
+        if (piece.startsWith('w')) fen += piece[1].toUpperCase();
+        else fen += piece[1].toLowerCase();
+      } else {
+        empty++;
+      }
+    }
+    if (empty > 0) fen += empty;
+    if (rank > 1) fen += '/';
+  }
+  const turn = document.getElementById('turn-select').value;
+  fen += ' ' + turn + ' KQkq - 0 1';
+  return fen;
+}
+
+function updateFenFromBoard() {
+  if (!board) return;
+  const pos = board.position();
+  document.getElementById('fen-input').value = positionToFen(pos);
+}
+
+function handleEditorDrop(source, target, piece, newPos, oldPos, orientation) {
+  if (target === 'offboard') return 'trash';
+  pendingDrop = {source: source, target: target, piece: piece};
+  return 'trash';
+}
+
+function handleEditorSnapEnd() {
+  if (pendingDrop) {
+    const drop = pendingDrop;
+    pendingDrop = null;
+    const pos = board.position();
+    pos[drop.target] = drop.piece;
+    board.position(pos, false);
+  }
+  updateFenFromBoard();
+}
+
+function buildBoard(fen, draggable) {
+  const cfg = {
+    position: fen,
+    pieceTheme: '/static/pieces/{piece}.svg',
+    draggable: draggable,
+    showNotation: true,
+  };
+  if (draggable) {
+    cfg.sparePieces = true;
+    cfg.dropOffBoard = 'trash';
+    cfg.onDrop = handleEditorDrop;
+    cfg.onSnapEnd = handleEditorSnapEnd;
+  }
+  if (board) board.destroy();
+  board = Chessboard('board', cfg);
+}
+
+function switchMode(mode) {
+  editorMode = (mode === 'editor');
+  const fenInput = document.getElementById('fen-input');
+  const fenGroup = document.getElementById('fen-group');
+  const editorControls = document.getElementById('editor-controls');
+
+  if (editorMode) {
+    const parts = fenInput.value.split(' ');
+    document.getElementById('turn-select').value = (parts.length > 1 && parts[1] === 'b') ? 'b' : 'w';
+    fenGroup.style.display = 'none';
+    editorControls.style.display = 'flex';
+    buildBoard(fenInput.value, true);
+    updateFenFromBoard();
+  } else {
+    fenGroup.style.display = 'block';
+    editorControls.style.display = 'none';
+    buildBoard(fenInput.value, false);
+  }
+}
+
 function updateBoard() {
   const fen = document.getElementById('fen-input').value;
-  const cfg = { position: fen, pieceTheme: '/static/pieces/{piece}.svg', draggable: false };
   if (board) board.position(fen, false);
-  else board = Chessboard('board', cfg);
+  else buildBoard(fen, false);
 }
+
+function clearBoard() {
+  board.position({}, false);
+  updateFenFromBoard();
+}
+
+function startPosition() {
+  board.position('start', false);
+  updateFenFromBoard();
+}
+
+function flipBoard() {
+  board.orientation('flip');
+}
+
 updateBoard();
 </script>
 {% endblock %}

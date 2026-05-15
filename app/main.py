@@ -15,7 +15,9 @@ from app.auth import (
     clear_session,
     current_user,
     current_user_optional,
+    generate_reset_token,
     set_session,
+    verify_reset_token,
 )
 from app.database import get_db, init_db
 from app.models import Puzzle, Review, User
@@ -148,6 +150,89 @@ async def login(
 async def logout():
     response = RedirectResponse("/", status_code=303)
     clear_session(response)
+    return response
+
+
+# ── password reset ────────────────────────────────────────────────────
+
+
+@app.get("/forgot-password", response_class=HTMLResponse)
+async def forgot_password_form(request: Request):
+    return templates.TemplateResponse(request, "forgot_password.html")
+
+
+@app.post("/forgot-password")
+async def forgot_password(
+    request: Request,
+    email: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    user = await db.scalar(select(User).where(User.email == email.lower().strip()))
+    if user is None:
+        return templates.TemplateResponse(
+            request, "forgot_password.html",
+            {"error": "No account found with that email address."},
+        )
+
+    token = generate_reset_token(user.id)
+    reset_url = str(request.url_for("reset_password_form")) + f"?token={token}"
+    return templates.TemplateResponse(
+        request,
+        "forgot_password.html",
+        {"reset_url": reset_url},
+    )
+
+
+@app.get("/reset-password", response_class=HTMLResponse)
+async def reset_password_form(
+    request: Request,
+    token: str,
+):
+    user_id = verify_reset_token(token)
+    if user_id is None:
+        return templates.TemplateResponse(
+            request, "reset_password.html", {"error": "Link expired or invalid."}
+        )
+    return templates.TemplateResponse(
+        request, "reset_password.html", {"token": token}
+    )
+
+
+@app.post("/reset-password")
+async def reset_password(
+    request: Request,
+    token: str = Form(...),
+    password: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    user_id = verify_reset_token(token)
+    if user_id is None:
+        return templates.TemplateResponse(
+            request, "reset_password.html",
+            {"error": "Link expired or invalid."},
+            status_code=400,
+        )
+
+    if len(password) < 6:
+        return templates.TemplateResponse(
+            request,
+            "reset_password.html",
+            {"token": token, "error": "Password must be at least 6 characters."},
+            status_code=400,
+        )
+
+    user = await db.get(User, user_id)
+    if user is None:
+        return templates.TemplateResponse(
+            request, "reset_password.html",
+            {"error": "User not found."},
+            status_code=400,
+        )
+
+    user.password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+    await db.commit()
+
+    response = RedirectResponse("/login", status_code=303)
     return response
 
 

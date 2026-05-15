@@ -1,6 +1,6 @@
 from fastapi import Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
-from itsdangerous import URLSafeSerializer
+from itsdangerous import URLSafeSerializer, URLSafeTimedSerializer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import SECRET_KEY
@@ -8,6 +8,7 @@ from app.database import get_db
 from app.models import User
 
 serializer = URLSafeSerializer(SECRET_KEY, salt="session")
+reset_serializer = URLSafeTimedSerializer(SECRET_KEY, salt="reset")
 COOKIE_NAME = "chess_session"
 
 
@@ -54,3 +55,14 @@ async def current_user_optional(
     except Exception:
         return None
     return await db.get(User, user_id)
+
+
+def generate_reset_token(user_id: int) -> str:
+    return reset_serializer.dumps(user_id)
+
+
+def verify_reset_token(token: str, max_age: int = 3600) -> int | None:
+    try:
+        return reset_serializer.loads(token, max_age=max_age)
+    except Exception:
+        return None
