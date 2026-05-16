@@ -56,7 +56,6 @@
 <script>
 let board;
 let editorMode = false;
-let pendingDrop = null;
 
 function positionToFen(pos) {
   let fen = '';
@@ -77,7 +76,7 @@ function positionToFen(pos) {
     if (rank > 1) fen += '/';
   }
   const turn = document.getElementById('turn-select').value;
-  fen += ' ' + turn + ' KQkq - 0 1';
+  fen += ' ' + turn + ' - - 0 1';
   return fen;
 }
 
@@ -87,21 +86,8 @@ function updateFenFromBoard() {
   document.getElementById('fen-input').value = positionToFen(pos);
 }
 
-function handleEditorDrop(source, target, piece, newPos, oldPos, orientation) {
+function handleEditorDrop(source, target) {
   if (target === 'offboard') return 'trash';
-  pendingDrop = {source: source, target: target, piece: piece};
-  return 'trash';
-}
-
-function handleEditorSnapEnd() {
-  if (pendingDrop) {
-    const drop = pendingDrop;
-    pendingDrop = null;
-    const pos = board.position();
-    pos[drop.target] = drop.piece;
-    board.position(pos, false);
-  }
-  updateFenFromBoard();
 }
 
 function buildBoard(fen, draggable) {
@@ -115,7 +101,7 @@ function buildBoard(fen, draggable) {
     cfg.sparePieces = true;
     cfg.dropOffBoard = 'trash';
     cfg.onDrop = handleEditorDrop;
-    cfg.onSnapEnd = handleEditorSnapEnd;
+    cfg.onChange = updateFenFromBoard;
   }
   if (board) board.destroy();
   board = Chessboard('board', cfg);
@@ -135,6 +121,7 @@ function switchMode(mode) {
     buildBoard(fenInput.value, true);
     updateFenFromBoard();
   } else {
+    if (board) updateFenFromBoard();
     fenGroup.style.display = 'block';
     editorControls.style.display = 'none';
     buildBoard(fenInput.value, false);
