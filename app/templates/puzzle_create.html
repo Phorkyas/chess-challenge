@@ -82,8 +82,10 @@ function positionToFen(pos) {
 
 function updateFenFromBoard() {
   if (!board) return;
-  const pos = board.position();
-  document.getElementById('fen-input').value = positionToFen(pos);
+  setTimeout(() => {
+    const pos = board.position();
+    document.getElementById('fen-input').value = positionToFen(pos);
+  }, 0);
 }
 
 function handleEditorDrop(source, target) {
